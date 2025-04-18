@@ -1,0 +1,13 @@
+export function login(username: string, password: string): string | null {
+  const users = [
+    { username: 'alice', password: '123456' },
+    { username: 'bob', password: 'abcdef' },
+  ];
+
+  const user = users.find(u => u.username === username && u.password === password);
+  if (user) {
+    // 真实场景下应使用 JWT，这里返回模拟 token
+    return `mock-token-${user.username}`;
+  }
+  return null;
+}
