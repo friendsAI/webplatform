@@ -10,7 +10,7 @@ const LoginPage = () => {
   const handleLogin = async (values: any) => {
     setLoading(true);
     try {
-      const res = await axios.post("http://192.168.22.233:8080/api/auth/login", {
+      const res = await axios.post("http://localhost:8888/api/auth/login", {
         username: values.username,
         password: values.password,
       });
@@ -23,6 +23,7 @@ const LoginPage = () => {
         message.error("登录失败：未返回 token");
       }
     } catch (err) {
+      console.error('登录错误：', err);
       message.error("用户名或密码错误");
     } finally {
       setLoading(false);
