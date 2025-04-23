@@ -10,18 +10,22 @@ import {
   Radio,
   Upload,
   Checkbox,
-  message
+  message,
 } from 'antd';
-import { SearchOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import {
+  SearchOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
 
 const { Title } = Typography;
 const { Dragger } = Upload;
 
-// 根据当前 host 自动拼接后端 API 地址和端口
 const apiBase = `http://${window.location.hostname}:8888/api`;
 
 interface Asset {
   key: string;
+  id?: number;
   name: string;
   source: string;
   filename?: string;
@@ -31,63 +35,81 @@ interface Asset {
 const AssetsPage: React.FC = () => {
   const [dataSource, setDataSource] = useState<Asset[]>([]);
   const [visible, setVisible] = useState(false);
+  const [editing, setEditing] = useState<Asset | null>(null);   // null ⇒ 新增
   const [form] = Form.useForm();
+  const [search, setSearch] = useState('');
 
-  const openModal = () => setVisible(true);
-  const closeModal = () => {
-    form.resetFields();
-    setVisible(false);
-  };
-
-  // 加载资产列表（空表/错误均能区别提示）
+  /* ---------- 列表 ---------- */
   const fetchAssets = async () => {
     try {
       const res = await fetch(`${apiBase}/assets/list`);
-      if (!res.ok) {
-        message.error(`加载资产列表失败：${res.status} ${res.statusText}`);
-        return;
-      }
       const list = await res.json();
       setDataSource(
-        list.map((item: any) => ({
-          key: String(item.id),
-          name: item.name,
-          source: item.source,
-          filename: item.filename,
-          uploaded_at: item.uploaded_at,
-        }))
+        list.map((i: any) => ({
+          key: String(i.id),
+          id: i.id,
+          name: i.name,
+          source: i.source,
+          filename: i.filename,
+          uploaded_at: i.uploaded_at,
+        })),
       );
-    } catch (err) {
-      console.error('fetchAssets error', err);
-      message.error('加载资产列表请求失败，请检查网络');
+    } catch (e) {
+      console.error(e);
+      message.error('加载资产列表失败');
     }
   };
-
   useEffect(() => {
     fetchAssets();
   }, []);
 
-  // 提交表单：先上传文件，再写入 data_assets
+  /* ---------- 弹窗控制 ---------- */
+  const openModal = () => {
+    setEditing(null);
+    form.resetFields();
+    setVisible(true);
+  };
+  const handleEdit = (rec: Asset) => {
+    setEditing(rec);
+    form.setFieldsValue({ name: rec.name, source: rec.source });
+    setVisible(true);
+  };
+  const closeModal = () => {
+    form.resetFields();
+    setEditing(null);
+    setVisible(false);
+  };
+
+  /* ---------- 表单提交 ---------- */
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
-      const { name, source, file, gen_key, encrypt_file, submit_enc_file } = values;
+      const { name, source, file, gen_key, encrypt_file, submit_enc_file } =
+        values;
 
-      // 1) 上传文件
-      const formData = new FormData();
-      formData.append('file', file[0].originFileObj);
-      const uploadRes = await fetch(`${apiBase}/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!uploadRes.ok) {
-        message.error(`文件上传失败：${uploadRes.status}`);
+      /* 编辑 */
+      if (editing) {
+        const res = await fetch(`${apiBase}/assets/${editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, source }),
+        });
+        if (!res.ok) throw new Error('更新失败');
+        message.success('更新成功');
+        closeModal();
+        fetchAssets();
         return;
       }
-      const { file_id } = await uploadRes.json();
 
-      // 2) 写入资产表
-      const assetRes = await fetch(`${apiBase}/assets`, {
+      /* 新增 */
+      const fd = new FormData();
+      fd.append('file', file[0].originFileObj);
+      const upRes = await fetch(`${apiBase}/upload`, {
+        method: 'POST',
+        body: fd,
+      });
+      const { file_id } = await upRes.json();
+      await fetch(`${apiBase}/assets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -99,21 +121,15 @@ const AssetsPage: React.FC = () => {
           submit_enc_file,
         }),
       });
-      if (assetRes.ok) {
-        message.success('新增资产成功');
-        closeModal();
-        fetchAssets();
-      } else {
-        const err = await assetRes.json();
-        message.error(err.error || '新增资产失败');
-      }
-    } catch (err) {
-      console.error('handleOk error', err);
-      // 表单验证失败或未知异常
-      message.error('操作失败，请确认必填项已填写');
+      message.success('新增成功');
+      closeModal();
+      fetchAssets();
+    } catch (e: any) {
+      message.error(e.message || '操作失败');
     }
   };
 
+  /* ---------- 列定义 ---------- */
   const columns = [
     { title: '资产名称', dataIndex: 'name', key: 'name' },
     { title: '数据来源', dataIndex: 'source', key: 'source' },
@@ -123,35 +139,53 @@ const AssetsPage: React.FC = () => {
       title: '操作',
       key: 'action',
       render: (_: any, record: Asset) => (
-        <Space size="middle">
+        <Space>
           <a>查看</a>
-          <a>编辑</a>
+          <a onClick={() => handleEdit(record)}>编辑</a>
           <a>删除</a>
         </Space>
       ),
     },
   ];
 
+  /* ---------- 渲染 ---------- */
+  const showUploader = !editing; // === 最小增量核心 ===
+
   return (
     <div style={{ padding: 24 }}>
       <Title level={2}>数据资产管理</Title>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginBottom: 16,
+        }}
+      >
         <Input
           placeholder="搜索数据资产"
           prefix={<SearchOutlined />}
           style={{ width: 300 }}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
         <Button type="primary" icon={<PlusOutlined />} onClick={openModal}>
           新增数据
         </Button>
       </div>
 
-      <Table dataSource={dataSource} columns={columns} rowKey="key" />
+      <Table
+        dataSource={dataSource.filter(
+          (d) =>
+            d.name.includes(search) || d.source.includes(search),
+        )}
+        columns={columns}
+        rowKey="key"
+      />
 
       <Modal
-        title="新增数据资产"
-        visible={visible}
+        title={editing ? '编辑数据资产' : '新增数据资产'}
+        open={visible}
         onOk={handleOk}
         onCancel={closeModal}
         okText="确定"
@@ -173,22 +207,31 @@ const AssetsPage: React.FC = () => {
             </Radio.Group>
           </Form.Item>
 
+          {/* ---------- 文件上传 / 已存在文件名 ---------- */}
           <Form.Item
             name="file"
             label="点击此上传文件"
             valuePropName="fileList"
             getValueFromEvent={(e: any) => e && e.fileList}
-            rules={[{ required: true, message: '请上传文件' }]}
+            rules={
+              showUploader ? [{ required: true, message: '请上传文件' }] : []
+            }
           >
-            <Dragger
-              name="file"
-              beforeUpload={() => false}
-              multiple={false}
-              style={{ padding: '24px 0' }}
-            >
-              <UploadOutlined style={{ fontSize: 32 }} />
-              <div>点击此上传文件</div>
-            </Dragger>
+            {showUploader ? (
+              <Dragger
+                name="file"
+                beforeUpload={() => false}
+                multiple={false}
+                style={{ padding: '24px 0' }}
+              >
+                <UploadOutlined style={{ fontSize: 32 }} />
+                <div>点击此上传文件</div>
+              </Dragger>
+            ) : (
+              <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                已上传文件：{editing?.filename || '（无文件名）'}
+              </div>
+            )}
           </Form.Item>
 
           <Form.Item name="gen_key" valuePropName="checked">
@@ -207,3 +250,4 @@ const AssetsPage: React.FC = () => {
 };
 
 export default AssetsPage;
+
