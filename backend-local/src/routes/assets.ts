@@ -75,16 +75,16 @@ router.delete('/:id', (req, res) => {
  * -------------------------------------------------------------------------*/
 router.put('/:id', (req, res) => {
   const id = Number(req.params.id);
-  const { name, source, description } = req.body ?? {};
+  const { name, source} = req.body ?? {};
   if (!id || !name) return res.status(400).json({ error: 'invalid payload' });
 
   db.prepare(
     `UPDATE data_assets
         SET name        = @name,
-            source      = COALESCE(@source, source),
-            description = COALESCE(@description, description)
+            source      = COALESCE(@source, source)
+           
       WHERE id = @id`
-  ).run({ id, name, source, description });
+  ).run({ id, name, source  });
 
   res.json({ ok: true });
 });
