@@ -1,13 +1,17 @@
 import { Router } from 'express';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-
 import db from '../db.js';
 
 /**
  * Router for /api/assets
  */
 const router = Router();
+
+/* ---------------------------------------------------------------------------
+ * helpers
+ * -------------------------------------------------------------------------*/
+const boolToInt = (v: unknown): number => Number(!!v);
 
 /* ---------------------------------------------------------------------------
  * GET /api/assets/list
@@ -18,20 +22,93 @@ router.get('/list', (_req, res) => {
       `SELECT a.id,
               a.name,
               a.source,
-              a.gen_key,
-	      a.encrypt_file,
-              a.submit_enc_file,
               a.created_at,
+              a.gen_key,
+              a.encrypt_file,
+              a.submit_enc_file,
               f.filename,
               f.filesize,
               f.uploaded_at
-         FROM data_assets a
-    LEFT JOIN uploaded_files f ON a.file_id = f.id
-     ORDER BY a.created_at DESC`
+       FROM data_assets a
+       LEFT JOIN uploaded_files f ON a.file_id = f.id
+       ORDER BY a.created_at DESC`
     )
     .all();
 
   res.json(rows);
+});
+
+/* ---------------------------------------------------------------------------
+ * POST /api/assets
+ * -------------------------------------------------------------------------*/
+router.post('/', (req, res) => {
+  const {
+    name,
+    source = 'upload',
+    file_id,
+    gen_key = 0,
+    encrypt_file = 0,
+    submit_enc_file = 0,
+  } = req.body ?? {};
+
+  if (!name || !file_id) return res.status(400).json({ error: 'invalid payload' });
+
+  const stmt = db.prepare(
+    `INSERT INTO data_assets
+        (name, source, file_id, gen_key, encrypt_file, submit_enc_file)
+     VALUES
+        (@name, @source, @file_id, @gen_key, @encrypt_file, @submit_enc_file)`
+  );
+
+  const info = stmt.run({
+    name,
+    source,
+    file_id,
+    gen_key: boolToInt(gen_key),
+    encrypt_file: boolToInt(encrypt_file),
+    submit_enc_file: boolToInt(submit_enc_file),
+  });
+
+  res.json({ id: info.lastInsertRowid });
+});
+
+/* ---------------------------------------------------------------------------
+ * PUT /api/assets/:id
+ * -------------------------------------------------------------------------*/
+router.put('/:id', (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: 'invalid id' });
+
+  const {
+    name,
+    source,
+    gen_key = null,
+    encrypt_file = null,
+    submit_enc_file = null,
+  } = req.body ?? {};
+
+  if (!name) return res.status(400).json({ error: 'name required' });
+
+  const stmt = db.prepare(
+    `UPDATE data_assets SET
+        name            = @name,
+        source          = COALESCE(@source, source),
+        gen_key         = COALESCE(@gen_key, gen_key),
+        encrypt_file    = COALESCE(@encrypt_file, encrypt_file),
+        submit_enc_file = COALESCE(@submit_enc_file, submit_enc_file)
+     WHERE id = @id`
+  );
+
+  stmt.run({
+    id,
+    name,
+    source,
+    gen_key: gen_key === null ? null : boolToInt(gen_key),
+    encrypt_file: encrypt_file === null ? null : boolToInt(encrypt_file),
+    submit_enc_file: submit_enc_file === null ? null : boolToInt(submit_enc_file),
+  });
+
+  res.json({ ok: true });
 });
 
 /* ---------------------------------------------------------------------------
@@ -44,11 +121,11 @@ router.delete('/:id', (req, res) => {
   const trx = db.transaction((id: number) => {
     const file = db
       .prepare(
-        `SELECT f.id   AS file_id,
+        `SELECT f.id AS file_id,
                 f.path AS path
-           FROM data_assets a
-           JOIN uploaded_files f ON a.file_id = f.id
-          WHERE a.id = ?`
+         FROM data_assets a
+         JOIN uploaded_files f ON a.file_id = f.id
+         WHERE a.id = ?`
       )
       .get(id) as { file_id?: number; path?: string } | undefined;
 
@@ -73,64 +150,7 @@ router.delete('/:id', (req, res) => {
 });
 
 /* ---------------------------------------------------------------------------
- * POST /api/assets
-  * -------------------------------------------------------------------------*/
-router.post('/', (req, res) => {
-  const {
-    name,
-    source       = 'upload',
-    file_id,
-    gen_key      = 0,
-    encrypt_file = 0,
-    submit_enc_file = 0,
-  } = req.body ?? {};
-
-  if (!name || !file_id)
-    return res.status(400).json({ error: 'invalid payload' });
-
-  const stmt = db.prepare(`
-    INSERT INTO data_assets
-      (name, source, file_id, gen_key, encrypt_file, submit_enc_file)
-    VALUES
-      (@name, @source, @file_id, @gen_key, @encrypt_file, @submit_enc_file)
-  `);
-
-  const info = stmt.run({
-    name,
-    source,
-    file_id,
-    gen_key,
-    encrypt_file,
-    submit_enc_file,
-  });
-
-  res.json({ id: info.lastInsertRowid });
-});
-
-
-/* ---------------------------------------------------------------------------
- * PUT /api/assets/:id
- * -------------------------------------------------------------------------*/
-router.put('/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const { name, source,gen_key, encrypt_file, submit_enc_file } = req.body ?? {};
-  if (!id || !name) return res.status(400).json({ error: 'invalid payload' });
-
-  db.prepare(
-    `UPDATE data_assets
-        SET name        = @name,
-            source      = COALESCE(@source, source),
-            gen_key         = COALESCE(@gen_key, gen_key),
-            encrypt_file    = COALESCE(@encrypt_file,encrypt_file),
-            submit_enc_file = COALESCE(@submit_enc_file, submit_enc_file)
-      WHERE id = @id`
-  ).run({ id, name, source  });
-
-  res.json({ ok: true });
-});
-
-/* ---------------------------------------------------------------------------
- * GET /api/assets/:id/schema
+ * GET /api/assets/:id/schema  (quick CSV header preview)
  * -------------------------------------------------------------------------*/
 router.get('/:id/schema', async (req, res) => {
   const id = Number(req.params.id);
@@ -139,9 +159,9 @@ router.get('/:id/schema', async (req, res) => {
   const row = db
     .prepare(
       `SELECT f.path
-         FROM data_assets a
-         JOIN uploaded_files f ON a.file_id = f.id
-        WHERE a.id = ?`
+       FROM data_assets a
+       JOIN uploaded_files f ON a.file_id = f.id
+       WHERE a.id = ?`
     )
     .get(id) as { path?: string } | undefined;
 
@@ -158,4 +178,3 @@ router.get('/:id/schema', async (req, res) => {
 });
 
 export default router;
-
