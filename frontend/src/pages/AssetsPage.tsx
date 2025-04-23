@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { buildSafeAssetUpdate, updateAsset } from './assets_edit'
 import {
   Typography,
   Input,
