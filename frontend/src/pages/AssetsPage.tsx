@@ -207,4 +207,3 @@ const AssetsPage: React.FC = () => {
 };
 
 export default AssetsPage;
-

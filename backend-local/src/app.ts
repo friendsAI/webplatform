@@ -10,8 +10,10 @@ import assetsRouter from './routes/assets.js';     // 资产接口
 const app = express();
 const PORT = 8888;
 
+
+app.use(express.json());  //Express 提供的内置中间件，用来解析application/json类型的请求体
 app.use(cors());
-app.use(bodyParser.json());
+//app.use(bodyParser.json()); //旧版本的解析中间件
 
 // ✅全部挂载
 app.use('/api/auth', authRouter);
