@@ -205,10 +205,13 @@ const AssetsPage: React.FC = () => {
       </div>
 
       <Table
-        dataSource={dataSource.filter(
-          (d) =>
-            d.name.includes(search) || d.source.includes(search),
-        )}
+        dataSource={dataSource.filter((d) => {
+          const kw = search.toLowerCase();           // ← ① 多行需要 { }
+          return (
+            d.name.toLowerCase().includes(kw) ||     // ← ② return 放在花括号里
+            d.source.toLowerCase().includes(kw)
+          );
+        })}
         columns={columns}
         rowKey="key"
       />
