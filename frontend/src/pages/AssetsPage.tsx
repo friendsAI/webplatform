@@ -31,6 +31,9 @@ interface Asset {
   source: string;
   filename?: string;
   uploaded_at?: string;
+  gen_key?: boolean;
+  encrypt_file?: boolean;
+  submit_enc_file?: boolean;
 }
 
 const AssetsPage: React.FC = () => {
@@ -53,7 +56,10 @@ const AssetsPage: React.FC = () => {
           source: i.source,
           filename: i.filename,
           uploaded_at: i.uploaded_at,
-        })),
+          gen_key: !!i.gen_key,
+          encrypt_file: !!i.encrypt_file,
+          submit_enc_file: !!i.submit_enc_file,
+       })),
       );
     } catch (e) {
       console.error(e);
@@ -72,7 +78,7 @@ const AssetsPage: React.FC = () => {
   };
   const handleEdit = (rec: Asset) => {
     setEditing(rec);
-    form.setFieldsValue({ name: rec.name, source: rec.source });
+    form.setFieldsValue({ name: rec.name, source: rec.source,gen_key:rec.gen_key,encrypt_file: rec.encrypt_file,submit_enc_file: rec.submit_enc_file, });
     setVisible(true);
   };
   const closeModal = () => {
@@ -93,7 +99,7 @@ const AssetsPage: React.FC = () => {
         const res = await fetch(`${apiBase}/assets/${editing.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, source }),
+          body: JSON.stringify({ name, source, gen_key, encrypt_file, submit_enc_file }),
         });
         if (!res.ok) throw new Error('更新失败');
         message.success('更新成功');

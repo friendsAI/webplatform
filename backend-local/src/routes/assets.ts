@@ -1,17 +1,20 @@
 import { Router } from 'express';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import db from '../db.js';
 
 /**
- * Router for /api/assets
+ * /api/assets router (checkbox bidirectional fix 2025‑04‑24)
  */
 const router = Router();
 
 /* ---------------------------------------------------------------------------
  * helpers
  * -------------------------------------------------------------------------*/
-const boolToInt = (v: unknown): number => Number(!!v);
+/**
+ * Truthy → 1, Falsy → 0,  Undefined / null → null  (keep‑as‑is sentinel)
+ */
+const toBitOrNull = (v: any): number | null =>
+  v === undefined || v === null ? null : v ? 1 : 0;
 
 /* ---------------------------------------------------------------------------
  * GET /api/assets/list
@@ -39,18 +42,10 @@ router.get('/list', (_req, res) => {
 });
 
 /* ---------------------------------------------------------------------------
- * POST /api/assets
+ * POST /api/assets —— 新增
  * -------------------------------------------------------------------------*/
 router.post('/', (req, res) => {
-  const {
-    name,
-    source = 'upload',
-    file_id,
-    gen_key = 0,
-    encrypt_file = 0,
-    submit_enc_file = 0,
-  } = req.body ?? {};
-
+  const { name, source = 'upload', file_id, gen_key, encrypt_file, submit_enc_file } = req.body ?? {};
   if (!name || !file_id) return res.status(400).json({ error: 'invalid payload' });
 
   const stmt = db.prepare(
@@ -64,49 +59,37 @@ router.post('/', (req, res) => {
     name,
     source,
     file_id,
-    gen_key: boolToInt(gen_key),
-    encrypt_file: boolToInt(encrypt_file),
-    submit_enc_file: boolToInt(submit_enc_file),
+    gen_key: toBitOrNull(gen_key) ?? 0,
+    encrypt_file: toBitOrNull(encrypt_file) ?? 0,
+    submit_enc_file: toBitOrNull(submit_enc_file) ?? 0,
   });
 
   res.json({ id: info.lastInsertRowid });
 });
 
 /* ---------------------------------------------------------------------------
- * PUT /api/assets/:id
+ * PUT /api/assets/:id —— 编辑
  * -------------------------------------------------------------------------*/
 router.put('/:id', (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ error: 'invalid id' });
 
-  const {
-    name,
-    source,
-    gen_key = null,
-    encrypt_file = null,
-    submit_enc_file = null,
-  } = req.body ?? {};
-
+  const { name, source, gen_key, encrypt_file, submit_enc_file } = req.body ?? {};
   if (!name) return res.status(400).json({ error: 'name required' });
 
-  const stmt = db.prepare(
+  const g  = toBitOrNull(gen_key);
+  const ef = toBitOrNull(encrypt_file);
+  const sf = toBitOrNull(submit_enc_file);
+
+  db.prepare(
     `UPDATE data_assets SET
         name            = @name,
-        source          = COALESCE(@source, source),
-        gen_key         = COALESCE(@gen_key, gen_key),
-        encrypt_file    = COALESCE(@encrypt_file, encrypt_file),
-        submit_enc_file = COALESCE(@submit_enc_file, submit_enc_file)
+        source          = COALESCE(@source,          source),
+        gen_key         = COALESCE(@g,               gen_key),
+        encrypt_file    = COALESCE(@ef,              encrypt_file),
+        submit_enc_file = COALESCE(@sf,              submit_enc_file)
      WHERE id = @id`
-  );
-
-  stmt.run({
-    id,
-    name,
-    source,
-    gen_key: gen_key === null ? null : boolToInt(gen_key),
-    encrypt_file: encrypt_file === null ? null : boolToInt(encrypt_file),
-    submit_enc_file: submit_enc_file === null ? null : boolToInt(submit_enc_file),
-  });
+  ).run({ id, name, source, g, ef, sf });
 
   res.json({ ok: true });
 });
@@ -115,23 +98,23 @@ router.put('/:id', (req, res) => {
  * DELETE /api/assets/:id
  * -------------------------------------------------------------------------*/
 router.delete('/:id', (req, res) => {
-  const assetId = Number(req.params.id);
-  if (!assetId) return res.status(400).json({ error: 'invalid id' });
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: 'invalid id' });
 
-  const trx = db.transaction((id: number) => {
+  const trx = db.transaction((assetId: number) => {
     const file = db
       .prepare(
-        `SELECT f.id AS file_id,
+        `SELECT f.id  AS file_id,
                 f.path AS path
          FROM data_assets a
          JOIN uploaded_files f ON a.file_id = f.id
          WHERE a.id = ?`
       )
-      .get(id) as { file_id?: number; path?: string } | undefined;
+      .get(assetId) as { file_id?: number; path?: string } | undefined;
 
     if (!file) throw new Error('asset not found');
 
-    db.prepare('DELETE FROM data_assets WHERE id = ?').run(id);
+    db.prepare('DELETE FROM data_assets WHERE id = ?').run(assetId);
     db.prepare('DELETE FROM uploaded_files WHERE id = ?').run(file.file_id);
 
     return file.path;
@@ -139,18 +122,17 @@ router.delete('/:id', (req, res) => {
 
   let filePath: string | undefined;
   try {
-    filePath = trx(assetId);
+    filePath = trx(id);
   } catch (e: any) {
     return res.status(404).json({ error: e.message });
   }
 
   if (filePath) fs.unlink(filePath).catch(() => {});
-
   res.json({ ok: true });
 });
 
 /* ---------------------------------------------------------------------------
- * GET /api/assets/:id/schema  (quick CSV header preview)
+ * GET /api/assets/:id/schema —— CSV header preview
  * -------------------------------------------------------------------------*/
 router.get('/:id/schema', async (req, res) => {
   const id = Number(req.params.id);
@@ -169,8 +151,7 @@ router.get('/:id/schema', async (req, res) => {
 
   try {
     const content = await fs.readFile(row.path, 'utf8');
-    const firstLine = content.split(/\r?\n/, 1)[0];
-    const columns = firstLine.split(',').map((c) => c.trim());
+    const columns = content.split(/\r?\n/, 1)[0].split(',').map((c) => c.trim());
     res.json({ columns });
   } catch {
     res.status(500).json({ error: 'failed to read csv' });
