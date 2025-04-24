@@ -10,7 +10,8 @@ const LoginPage = () => {
   const handleLogin = async (values: any) => {
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:8888/api/auth/login", {
+      //const res = await axios.post("http://localhost:8888/api/auth/login", {
+      const res = await axios.post("/api/auth/login", {
         username: values.username,
         password: values.password,
       });
