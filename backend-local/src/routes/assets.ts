@@ -1,18 +1,19 @@
 import { Router } from 'express';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import db from '../db.js';
 
 /**
- * /api/assets router (checkbox bidirectional fix 2025‑04‑24)
+ * /api/assets router (fix missing f.path 2025‑04‑24)
  */
 const router = Router();
+
+// 上传目录（与上传接口保持一致）
+const UPLOAD_DIR = path.resolve('upload');
 
 /* ---------------------------------------------------------------------------
  * helpers
  * -------------------------------------------------------------------------*/
-/**
- * Truthy → 1, Falsy → 0,  Undefined / null → null  (keep‑as‑is sentinel)
- */
 const toBitOrNull = (v: any): number | null =>
   v === undefined || v === null ? null : v ? 1 : 0;
 
@@ -105,19 +106,19 @@ router.delete('/:id', (req, res) => {
     const file = db
       .prepare(
         `SELECT f.id  AS file_id,
-                f.path AS path
+                f.filename AS filename
          FROM data_assets a
          JOIN uploaded_files f ON a.file_id = f.id
          WHERE a.id = ?`
       )
-      .get(assetId) as { file_id?: number; path?: string } | undefined;
+      .get(assetId) as { file_id?: number; filename?: string } | undefined;
 
     if (!file) throw new Error('asset not found');
 
     db.prepare('DELETE FROM data_assets WHERE id = ?').run(assetId);
     db.prepare('DELETE FROM uploaded_files WHERE id = ?').run(file.file_id);
 
-    return file.path;
+    return path.join(UPLOAD_DIR, file.filename as string);
   });
 
   let filePath: string | undefined;
@@ -140,17 +141,19 @@ router.get('/:id/schema', async (req, res) => {
 
   const row = db
     .prepare(
-      `SELECT f.path
+      `SELECT f.filename
        FROM data_assets a
        JOIN uploaded_files f ON a.file_id = f.id
        WHERE a.id = ?`
     )
-    .get(id) as { path?: string } | undefined;
+    .get(id) as { filename?: string } | undefined;
 
-  if (!row?.path) return res.status(404).json({ error: 'file not found' });
+  if (!row?.filename) return res.status(404).json({ error: 'file not found' });
+
+  const fullPath = path.join(UPLOAD_DIR, row.filename);
 
   try {
-    const content = await fs.readFile(row.path, 'utf8');
+    const content = await fs.readFile(fullPath, 'utf8');
     const columns = content.split(/\r?\n/, 1)[0].split(',').map((c) => c.trim());
     res.json({ columns });
   } catch {

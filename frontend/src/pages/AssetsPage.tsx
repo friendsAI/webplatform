@@ -149,13 +149,36 @@ const AssetsPage: React.FC = () => {
         <Space>
           <a>查看</a>
           <a onClick={() => handleEdit(record)}>编辑</a>
-          <a>删除</a>
+          <a onClick={() => handleDelete(record)}>删除</a>
         </Space>
       ),
     },
   ];
 
-  /* ---------- 渲染 ---------- */
+  const handleDelete = (rec: Asset) => {
+    Modal.confirm({
+      title: `确定删除「${rec.name}」吗？`,
+      okText: '确定',
+      okType: 'danger',
+      cancelText: '取消',
+      async onOk() {
+        try {
+          const res = await fetch(`${apiBase}/assets/${rec.id}`, {
+            method: 'DELETE',
+          });
+          const result = await res.json();
+	  if (!res.ok || result.error) throw new Error( result.error || '删除失败');
+          message.success('删除成功');
+          fetchAssets();
+        } catch (e: any) {
+          message.error(e.message || '删除失败');
+        }
+      },
+    });
+  }; 
+ 
+ 
+ /* ---------- 渲染 ---------- */
   const showUploader = !editing; // === 最小增量核心 ===
 
   return (
