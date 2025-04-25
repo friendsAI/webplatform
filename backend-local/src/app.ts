@@ -19,7 +19,8 @@ app.use(cors());
 app.use('/api/auth', authRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/assets', assetsRouter);
-app.use('/api/keys', keysRouter);
+app.use('/api/keys', keysRouter);  // 包括了 /files/by-asset 路由
+
 // 测试接口
 app.get('/ping', (_req, res) => {
   res.send('pong');
