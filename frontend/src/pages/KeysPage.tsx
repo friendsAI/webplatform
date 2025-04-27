@@ -91,15 +91,21 @@ const KeysPage: React.FC = () => {
     }
   };
 
-  const handleEncrypt =async (rec: KeyRow) => {
+  const handleEncrypt = async (rec: KeyRow) => {
     setEncryptTarget(rec);
     setSelectedFileId(null);
-    const res = await fetch(`${apiBase}/keys/files/by-asset/${rec.id}`);
-    const list = await res.json();
-    setFileList(list);
-    setEncryptModalVisible(true);
+    setPage(1);
+    try {
+      const res = await fetch(`${apiBase}/keys/files/by-asset/${rec.id}`);
+      const list = await res.json();
+      setFileList(Array.isArray(list) ? list : []);
+      setEncryptModalVisible(true);
+    } catch (e) {
+      console.error('加载文件失败', e);
+      message.error('加载文件失败');
+      setFileList([]);
+    }
   };
-  
 
   const columns = [
     {

@@ -50,16 +50,15 @@ router.get('/list', (_req, res) => {
     }
   });
 
-  // 新增接口：根据资产 ID 获取文件列表
+  // 新增接口：根据资产 名称 获取文件列表
   router.get('/files/by-asset/:assetsId', (req, res) => {
-    const { assetsId } = req.params;
+    //const { assetsId } = req.params;
     try {
       const files = db.prepare(
         `SELECT id, filename, uploaded_at
          FROM uploaded_files
-         WHERE assets_id = ? 
          ORDER BY uploaded_at DESC`
-      ).all(assetsId);
+      ).all();
       res.json(files);
     } catch (err) {
       console.error('查询文件失败:', err);
