@@ -30,7 +30,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     {
       key: 'main',
       icon: <DatabaseOutlined />,
-      label: 'Dashboard',
+      label: '首页',
     },
     {
       key: 'assets',
@@ -69,7 +69,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         padding: '0 24px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
-        <Title level={4} style={{ margin: 0 }}>DASHBOARD</Title>
+        <Title level={4} style={{ margin: 0 }}>天行网安机密计算平台</Title>
         <Button 
           icon={<LogoutOutlined />} 
           onClick={handleLogout}

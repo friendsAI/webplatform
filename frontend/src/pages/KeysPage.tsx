@@ -174,14 +174,44 @@ const KeysPage: React.FC = () => {
         open={encryptModalVisible}
         title="选择待加密文件"
         onCancel={() => setEncryptModalVisible(false)}
-        onOk={() => {
-          if (selectedFileId) {
-            message.success(`已选择文件 ${selectedFileId} 进行加密`);
-            setEncryptModalVisible(false);
+        //onOk={() => {
+          //if (selectedFileId) {
+            //message.success(`已选择文件 ${selectedFileId} 进行加密`);
+            //setEncryptModalVisible(false);
+          //} else {
+            //message.warning('请先选择一个文件');
+          //}
+        //}}
+        onOk={async () => {
+          if (selectedFileId && encryptTarget) {
+            try {
+              const res = await fetch(`${apiBase}/keys/encrypt`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  fileId: selectedFileId,
+                  keyId: encryptTarget.id,
+                }),
+              });
+        
+              const result = await res.json();
+        
+              if (res.ok) {
+                message.success('加密成功！');
+                setEncryptModalVisible(false);
+              } else {
+                message.error(`加密失败: ${result.error || '未知错误'}`);
+              }
+            } catch (err) {
+              console.error('请求加密失败:', err);
+              message.error('请求加密接口失败');
+            }
           } else {
             message.warning('请先选择一个文件');
           }
-        }}
+        }}        
         okText="加密"
         cancelText="取消"
         width={600}

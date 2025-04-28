@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { execSync } from 'child_process';
+import { execSync,exec } from 'child_process';
 import { randomUUID } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import db from '../db.js';
+import { uploadDir, encryptedDir, envDir } from '../config/paths.js';
 
 const router = Router();
 
@@ -20,11 +21,11 @@ router.get('/list', (_req, res) => {
     res.json(rows);
   });
 
-  router.post('/generate', async (_req, res) => {
-    try {
-      const id = randomUUID();
-      const baseDir = '/home/projects/TEE_trustflow/test';
-      const keyDir = path.join(baseDir, id);
+router.post('/generate', async (_req, res) => {
+  try {
+    const id = randomUUID();
+    //const baseDir = '/home/projects/TEE_trustflow/test';
+    const keyDir = path.join(envDir, id);
       fs.mkdirSync(keyDir, { recursive: true });
   
       // 切换环境 & 生成密钥
@@ -51,20 +52,71 @@ router.get('/list', (_req, res) => {
   });
 
   // 新增接口：根据资产 名称 获取文件列表
-  router.get('/files/by-asset/:assetsId', (req, res) => {
-    //const { assetsId } = req.params;
-    try {
-      const files = db.prepare(
-        `SELECT id, filename, uploaded_at
-         FROM uploaded_files
-         ORDER BY uploaded_at DESC`
+router.get('/files/by-asset/:assetsId', (req, res) => {
+  //const { assetsId } = req.params;
+  try {
+    const files = db.prepare(
+      `SELECT id, filename, uploaded_at
+        FROM uploaded_files
+        ORDER BY uploaded_at DESC`
       ).all();
-      res.json(files);
+    res.json(files);
     } catch (err) {
-      console.error('查询文件失败:', err);
-      res.status(500).json({ error: '查询失败' });
+    console.error('查询文件失败:', err);
+    res.status(500).json({ error: '查询失败' });
     }
   });
+
+// 加密接口
+router.post('/encrypt', async (req, res) => {
+  const { fileId, keyId } = req.body;
+  if (isNaN(Number(fileId)) || !keyId.trim()) {
+    return res.status(400).json({ error: 'fileId或keyId格式不正确' });
+  }
+
+  try {
+    // 获取加密密钥
+    const keyRow = db.prepare('SELECT enc_key FROM data_encrypt_key WHERE id = ?').get(keyId) as { enc_key: string };
+    if (!keyRow) return res.status(404).json({ error: '未找到密钥' });
+
+    // 获取源文件信息
+    const fileRow = db.prepare('SELECT filepath FROM uploaded_files WHERE id = ?').get(Number(fileId)) as { filepath: string };
+    if (!fileRow) return res.status(404).json({ error: '未找到源文件' });
+
+    //const sourceFilePath = `${uploadDir}/${fileRow.filepath}`;
+    const sourceFilePath = `${fileRow.filepath}`;
+    //const destFilePath = `${fileRow.filepath}.enc`;
+    const destFilePath = sourceFilePath.replace('/uploads/', '/encrypted/') + '.enc';
+    
+    // 生成加密命令
+    const encryptCmd = `bash -c "source ~/.bashrc && conda activate capsule-manager-sdk && cms_util encrypt-file --source-file ${sourceFilePath} --dest-file ${destFilePath} --data-key-b64 ${keyRow.enc_key}"`;
+    console.log('sourceFilePath',sourceFilePath);
+    console.log('destFilePath',destFilePath);
+    console.log('enc_key',keyRow.enc_key);
+
+    // 执行加密命令
+    exec(encryptCmd, (err, stdout, stderr) => {
+      if (err) {
+        console.error('加密失败:', stderr);
+        return res.status(500).json({ error: '加密命令执行失败' });
+      }
+
+      console.log('加密成功:', stdout);
+
+      // 插入到 encrypted_files 表
+      const encryptedId = randomUUID();
+      db.prepare(
+        `INSERT INTO encrypted_files (id, file_id, key_id, encrypted_file_path, status, created_on)
+         VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))`
+      ).run(encryptedId, fileId, keyId, destFilePath, 'success');
+
+      res.json({ ok: true, id: encryptedId });
+    });
+  } catch (err) {
+    console.error('加密接口异常:', err);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
 
 export default router;
 
