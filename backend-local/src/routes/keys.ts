@@ -87,7 +87,7 @@ router.post('/encrypt', async (req, res) => {
     const sourceFilePath = `${fileRow.filepath}`;
     //const destFilePath = `${fileRow.filepath}.enc`;
     const destFilePath = sourceFilePath.replace('/uploads/', '/encrypted/') + '.enc';
-    
+
     // 生成加密命令
     const encryptCmd = `bash -c "source ~/.bashrc && conda activate capsule-manager-sdk && cms_util encrypt-file --source-file ${sourceFilePath} --dest-file ${destFilePath} --data-key-b64 ${keyRow.enc_key}"`;
     console.log('sourceFilePath',sourceFilePath);
@@ -101,14 +101,29 @@ router.post('/encrypt', async (req, res) => {
         return res.status(500).json({ error: '加密命令执行失败' });
       }
 
-      console.log('加密成功:', stdout);
+      console.log('加密成功!', stdout);
 
       // 插入到 encrypted_files 表
       const encryptedId = randomUUID();
-      db.prepare(
+      //db.prepare(
+        //`INSERT INTO encrypted_files (id, file_id, key_id, encrypted_file_path, status, created_on)
+         //VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))`
+      //).run(encryptedId, fileId, keyId, destFilePath, 'success');
+      const insertEncrypted = db.prepare(
         `INSERT INTO encrypted_files (id, file_id, key_id, encrypted_file_path, status, created_on)
          VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))`
-      ).run(encryptedId, fileId, keyId, destFilePath, 'success');
+      );
+
+      const updateKeyStatus = db.prepare(
+        `UPDATE data_encrypt_key SET status = 'invalid' WHERE id = ?`
+      );
+
+      const transaction = db.transaction(() => {
+        insertEncrypted.run(encryptedId, fileId, keyId, destFilePath, 'success');
+        updateKeyStatus.run(keyId);
+      });
+
+      transaction();
 
       res.json({ ok: true, id: encryptedId });
     });

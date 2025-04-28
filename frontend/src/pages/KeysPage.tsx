@@ -130,9 +130,16 @@ const KeysPage: React.FC = () => {
       title: '操作',
       key: 'action',
       render: (_: any, rec: KeyRow) => (
-        <Space>
-          <a onClick={() => handleEncrypt(rec)}>加密</a>
-        </Space>
+        //<Space>
+          //<a onClick={() => handleEncrypt(rec)}>加密</a>
+        //</Space>
+        <Button
+          type="primary"
+          onClick={() => handleEncrypt(rec)}
+          disabled={rec.status === 'invalid'} 
+        >
+          加密
+        </Button>
       ),
     },
   ];
