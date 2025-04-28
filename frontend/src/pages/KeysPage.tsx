@@ -189,6 +189,7 @@ const KeysPage: React.FC = () => {
             //message.warning('请先选择一个文件');
           //}
         //}}
+        
         onOk={async () => {
           if (selectedFileId && encryptTarget) {
             try {
@@ -208,6 +209,10 @@ const KeysPage: React.FC = () => {
               if (res.ok) {
                 message.success('加密成功！');
                 setEncryptModalVisible(false);
+                window.location.reload(); //加密成功后重新刷新页面
+                //</div>fetch(`${apiBase}/keys`)
+                  //.then((res) => res.json())
+                  //.then((data) => setKeysList(data));
               } else {
                 message.error(`加密失败: ${result.error || '未知错误'}`);
               }
@@ -221,7 +226,7 @@ const KeysPage: React.FC = () => {
         }}        
         okText="加密"
         cancelText="取消"
-        width={600}
+        width={500}
       >
         <Table
           rowSelection={{
