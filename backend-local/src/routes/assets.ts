@@ -1,15 +1,13 @@
 import { Router } from 'express';
 import fs from 'node:fs/promises';
-import path from 'node:path';
+//import path from 'node:path';
+import { uploadDir } from '../config/paths.js';
 import db from '../db.js';
 
 /**
  * /api/assets router (fix missing f.path 2025‑04‑24)
  */
 const router = Router();
-
-// 上传目录（与上传接口保持一致）
-const UPLOAD_DIR = path.resolve('upload');
 
 /* ---------------------------------------------------------------------------
  * helpers
@@ -118,7 +116,8 @@ router.delete('/:id', (req, res) => {
     db.prepare('DELETE FROM data_assets WHERE id = ?').run(assetId);
     db.prepare('DELETE FROM uploaded_files WHERE id = ?').run(file.file_id);
 
-    return path.join(UPLOAD_DIR, file.filename as string);
+    return `${uploadDir}/${file.filename}`;
+
   });
 
   let filePath: string | undefined;
@@ -150,7 +149,7 @@ router.get('/:id/schema', async (req, res) => {
 
   if (!row?.filename) return res.status(404).json({ error: 'file not found' });
 
-  const fullPath = path.join(UPLOAD_DIR, row.filename);
+  const fullPath =`${uploadDir}/${row.filename}`;
 
   try {
     const content = await fs.readFile(fullPath, 'utf8');
