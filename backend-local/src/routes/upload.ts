@@ -6,13 +6,14 @@ import fs from 'fs';
 import db from '../db.ts';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { uploadDir } from '../config/paths.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const router = express.Router();
 
-const uploadDir = path.join(__dirname, '../uploads');
+//const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
 const storage = multer.diskStorage({
