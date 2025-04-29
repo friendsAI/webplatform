@@ -183,8 +183,7 @@ const AssetsPage: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Title level={2}>数据资产管理</Title>
-
+      
       <div
         style={{
           display: 'flex',

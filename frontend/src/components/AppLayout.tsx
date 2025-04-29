@@ -75,7 +75,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
     {/* 中间标题 */}
     <div style={{ flex: 1, textAlign: 'center' }}>
-      <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
+      <Title level={4} style={{ margin: 0,fontSize: '32px',  color: '#1890ff' }}>
         天 行 网 安 机 密 计 算 平 台
       </Title>
     </div>

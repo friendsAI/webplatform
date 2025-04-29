@@ -78,7 +78,7 @@ const TasksPage = () => {
   return (
     <>
       <div style={{ padding: '24px' }}>
-        <Title level={2}>任务管理</Title>
+        
         <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
           <Input
             placeholder="搜索任务"

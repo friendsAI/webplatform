@@ -111,6 +111,7 @@ const KeysPage: React.FC = () => {
 
   };
 
+
   const handleDelete = (rec: KeyRow) => {
       Modal.confirm({
         title: `确定删除「${rec.id}」吗？`,
@@ -177,7 +178,7 @@ const KeysPage: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <Title level={2}>密钥管理</Title>
+      
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Input
