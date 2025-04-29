@@ -107,6 +107,36 @@ const KeysPage: React.FC = () => {
     }
   };
 
+  const handleSubmitKey=async (rec: KeyRow) => {
+
+  };
+
+  const handleDelete = (rec: KeyRow) => {
+      Modal.confirm({
+        title: `确定删除「${rec.id}」吗？`,
+        okText: '确定',
+        okType: 'danger',
+        cancelText: '取消',
+        async onOk() {
+          try {
+            const res = await fetch(`${apiBase}/keys/${rec.id}`, {
+              method: 'DELETE',
+            });
+            const result = await res.json();
+      if (!res.ok || result.error) throw new Error( result.error || '删除失败');
+            message.success('删除成功');
+            fetchKeys();
+          } catch (e: any) {
+            message.error(e.message || '删除失败');
+          }
+        },
+      });
+    }; 
+
+
+
+
+
   const columns = [
     {
       title: '密钥名称',
@@ -130,16 +160,15 @@ const KeysPage: React.FC = () => {
       title: '操作',
       key: 'action',
       render: (_: any, rec: KeyRow) => (
-        //<Space>
-          //<a onClick={() => handleEncrypt(rec)}>加密</a>
-        //</Space>
-        <Button
-          type="primary"
-          onClick={() => handleEncrypt(rec)}
-          disabled={rec.status === 'invalid'} 
-        >
-          加密
-        </Button>
+        <Space>
+          {rec.status === 'invalid' ? (
+            <span style={{ color: 'gray', cursor: 'not-allowed' }}>加密</span>
+          ) : (
+          <a onClick={() => handleEncrypt(rec)}>加密</a>
+          )}
+          <a onClick={() => handleSubmitKey(rec)}>提交密钥</a> 
+          <a onClick={() => handleDelete(rec)}>删除</a> 
+        </Space>
       ),
     },
   ];
@@ -181,14 +210,6 @@ const KeysPage: React.FC = () => {
         open={encryptModalVisible}
         title="选择待加密文件"
         onCancel={() => setEncryptModalVisible(false)}
-        //onOk={() => {
-          //if (selectedFileId) {
-            //message.success(`已选择文件 ${selectedFileId} 进行加密`);
-            //setEncryptModalVisible(false);
-          //} else {
-            //message.warning('请先选择一个文件');
-          //}
-        //}}
         
         onOk={async () => {
           if (selectedFileId && encryptTarget) {

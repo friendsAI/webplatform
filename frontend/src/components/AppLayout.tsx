@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Menu, Button, Typography } from 'antd';
+import { Layout, Menu, Button, Typography,Space } from 'antd';
 import {
   DatabaseOutlined,
   KeyOutlined,
@@ -9,6 +9,7 @@ import {
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
+import companyLogo from '../static/company-logo.jpg';
 
 const { Header, Sider, Content } = Layout;
 const { Title } = Typography;
@@ -62,21 +63,43 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        background: '#fff',
-        padding: '0 24px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <Title level={4} style={{ margin: 0 }}>天行网安机密计算平台</Title>
+  background: '#fff',
+  padding: '0 24px',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  height: '64px'
+}}>
+  {/* 只在内部加flex容器 */}
+  <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+    {/* 左边空 */}
+    <div style={{ flex: 1 }} />
+
+    {/* 中间标题 */}
+    <div style={{ flex: 1, textAlign: 'center' }}>
+      <Title level={4} style={{ margin: 0, color: '#1890ff' }}>
+        天 行 网 安 机 密 计 算 平 台
+      </Title>
+    </div>
+
+    {/* 右边图片 + 按钮 */}
+    <div style={{ flex: 1, textAlign: 'right' }}>
+      <Space size="middle">
+        <img src={companyLogo} alt="Company Logo" style={{ height: '120px' }} />
         <Button 
           icon={<LogoutOutlined />} 
           onClick={handleLogout}
+          style={{
+            backgroundColor: '#e6f7ff',
+            borderColor: '#91d5ff',
+            color: '#1890ff'
+          }}
         >
           Log Out
         </Button>
-      </Header>
+      </Space>
+    </div>
+  </div>
+</Header>
+
       <Layout>
         <Sider width={200} theme="light">
           <Menu

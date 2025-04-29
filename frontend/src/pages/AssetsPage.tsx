@@ -147,7 +147,7 @@ const AssetsPage: React.FC = () => {
       key: 'action',
       render: (_: any, record: Asset) => (
         <Space>
-          <a>查看</a>
+          {/* <a>查看</a> */}
           <a onClick={() => handleEdit(record)}>编辑</a>
           <a onClick={() => handleDelete(record)}>删除</a>
         </Space>
@@ -266,7 +266,7 @@ const AssetsPage: React.FC = () => {
               </div>
             )}
           </Form.Item>
-
+          {/*
           <Form.Item name="gen_key" valuePropName="checked">
             <Checkbox>产生密钥</Checkbox>
           </Form.Item>
@@ -276,6 +276,7 @@ const AssetsPage: React.FC = () => {
           <Form.Item name="submit_enc_file" valuePropName="checked">
             <Checkbox>提交应密文件</Checkbox>
           </Form.Item>
+          */}
         </Form>
       </Modal>
     </div>

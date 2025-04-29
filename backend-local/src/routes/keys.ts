@@ -67,6 +67,25 @@ router.get('/files/by-asset/:assetsId', (req, res) => {
     }
   });
 
+router.delete('/:id', (req, res) => {
+  const id = req.params.id;
+  if (!id) return res.status(400).json({ error: 'invalid id' });
+  try {
+    const trx = db.transaction((keyId: string) => {
+      const existing = db.prepare('SELECT id FROM data_encrypt_key WHERE id = ?').get(keyId);
+      if (!existing) throw new Error('指定的密钥不存在');
+      db.prepare('DELETE FROM data_encrypt_key WHERE id = ?').run(keyId);
+    });
+
+    trx(id);  
+    res.json({ ok: true });  // 成功返回
+  } catch (error: any) {
+    console.error('删除密钥失败:', error);
+    res.status(500).json({ error: error.message || '删除失败' });
+  }
+  });
+
+
 // 加密接口
 router.post('/encrypt', async (req, res) => {
   const { fileId, keyId } = req.body;
@@ -80,19 +99,16 @@ router.post('/encrypt', async (req, res) => {
     if (!keyRow) return res.status(404).json({ error: '未找到密钥' });
 
     // 获取源文件信息
-    const fileRow = db.prepare('SELECT filepath FROM uploaded_files WHERE id = ?').get(Number(fileId)) as { filepath: string };
+    const fileRow = db.prepare('SELECT filename,filepath FROM uploaded_files WHERE id = ?').get(Number(fileId)) as { filename: string; filepath: string };
     if (!fileRow) return res.status(404).json({ error: '未找到源文件' });
 
-    //const sourceFilePath = `${uploadDir}/${fileRow.filepath}`;
     const sourceFilePath = `${fileRow.filepath}`;
-    //const destFilePath = `${fileRow.filepath}.enc`;
-    const destFilePath = sourceFilePath.replace('/uploads/', '/encrypted/') + '.enc';
+    const destFilePath = path.join(envDir, keyId, fileRow.filename+'.enc');
 
     // 生成加密命令
     const encryptCmd = `bash -c "source ~/.bashrc && conda activate capsule-manager-sdk && cms_util encrypt-file --source-file ${sourceFilePath} --dest-file ${destFilePath} --data-key-b64 ${keyRow.enc_key}"`;
-    console.log('sourceFilePath',sourceFilePath);
-    console.log('destFilePath',destFilePath);
-    console.log('enc_key',keyRow.enc_key);
+    console.log('sourceFilePath:',sourceFilePath);
+    console.log('destFilePath:',destFilePath);
 
     // 执行加密命令
     exec(encryptCmd, (err, stdout, stderr) => {
@@ -105,10 +121,6 @@ router.post('/encrypt', async (req, res) => {
 
       // 插入到 encrypted_files 表
       const encryptedId = randomUUID();
-      //db.prepare(
-        //`INSERT INTO encrypted_files (id, file_id, key_id, encrypted_file_path, status, created_on)
-         //VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))`
-      //).run(encryptedId, fileId, keyId, destFilePath, 'success');
       const insertEncrypted = db.prepare(
         `INSERT INTO encrypted_files (id, file_id, key_id, encrypted_file_path, status, created_on)
          VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))`
@@ -117,10 +129,17 @@ router.post('/encrypt', async (req, res) => {
       const updateKeyStatus = db.prepare(
         `UPDATE data_encrypt_key SET status = 'invalid' WHERE id = ?`
       );
-
+      
+      const stmt = db.prepare(`
+        UPDATE data_encrypt_key
+        SET assets_id = (SELECT id FROM data_assets WHERE file_id = @fileId)
+        WHERE id = @keyId
+      `);
+      
       const transaction = db.transaction(() => {
         insertEncrypted.run(encryptedId, fileId, keyId, destFilePath, 'success');
         updateKeyStatus.run(keyId);
+        stmt.run({ fileId, keyId });
       });
 
       transaction();
